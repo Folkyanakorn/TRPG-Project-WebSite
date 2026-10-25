@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VN TRPG</title>
+<style>
+:root {
+    --glass: rgba(14, 16, 22, 0.36);
+    --glass-solid: rgba(14, 16, 22, 0.72);
+    --line: rgba(255, 255, 255, 0.14);
+    --line-soft: rgba(255, 255, 255, 0.07);
+    --fill: rgba(255, 255, 255, 0.06);
+    --fill-hover: rgba(255, 255, 255, 0.13);
+    --text: #f3f2ee;
+    --muted: rgba(243, 242, 238, 0.55);
+    --accent: #e9d8a6;
+    --danger: #ff8080;
+    --hp: #e98383;
+    --sp: #86b6ea;
+    --radius: 14px;
+    --left-inset: 280px;
+    --right-inset: 376px;
+    font-family: "Segoe UI", "Noto Sans Thai", Tahoma, system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: inherit; }
+html, body { height: 100%; }
+body {
+    background: #090b10; color: var(--text); overflow: hidden;
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+}
+body.status-collapsed { --left-inset: 24px; }
+body.chat-collapsed { --right-inset: 24px; }
+
+/* ---------- glass ---------- */
+.glass {
+    background: var(--glass);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass { background: var(--glass-solid); }
+}
+.eyebrow { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+
+/* ---------- controls ---------- */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--fill); color: var(--text); font-size: 0.9rem; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.btn:hover { background: var(--fill-hover); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, .field:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #1b1a14; font-weight: 600; }
+.btn-primary:hover { background: #f3e5b8; }
+.btn-danger { border-color: rgba(255, 128, 128, 0.5); color: var(--danger); }
+.btn-danger:hover { background: rgba(255, 128, 128, 0.14); }
+.btn-sm { padding: 5px 10px; font-size: 0.8rem; border-radius: 8px; }
+.btn-block { width: 100%; }
+.field {
+    width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: rgba(0, 0, 0, 0.22); color: var(--text); font-size: 0.92rem;
+}
+.field::placeholder { color: rgba(243, 242, 238, 0.35); }
+.field:focus { border-color: var(--accent); outline: none; }
+select.field option { background: #1a1d26; color: var(--text); }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { flex: 1; min-width: 0; }
+
+/* ---------- VN screen ---------- */
+#vn-screen {
+    position: fixed; inset: 0;
+    background: #0b0d12 linear-gradient(160deg, #1d2433, #0b0d12 70%) center/cover no-repeat;
+    background-image: url('https://images.unsplash.com/photo-1519074069444-1ba4fff66d16?q=80&w=1920');
+    overflow: hidden;
+}
+#vn-screen::after { /* vignette เบาๆ ช่วยให้ panel อ่านง่าย */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45));
+}
+
+.sprite-slot {
+    position: absolute; bottom: 190px; height: 66vh; z-index: 5;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.5s ease, transform 0.5s ease, filter 0.4s ease;
+}
+.sprite-slot.left { left: calc(var(--left-inset) + 3%); transform: translateX(-48px); }
+.sprite-slot.right { right: calc(var(--right-inset) + 3%); transform: translateX(48px); }
+.sprite-slot.show { opacity: 1; transform: none; }
+.sprite-slot.dim { filter: brightness(0.55) saturate(0.8); }
+.sprite-slot img {
+    height: 100%; max-width: 34vw; object-fit: contain; border-radius: 18px;
+    filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.55));
+}
+.sprite-name {
+    position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%);
+    padding: 3px 12px; border-radius: 99px; font-size: 0.78rem; white-space: nowrap;
+    background: var(--glass-solid); border: 1px solid var(--line);
+}
+
+/* dialog */
+#vn-dialog-box {
+    position: absolute; z-index: 10; bottom: 24px;
+    left: 24px; right: var(--right-inset); max-width: 880px; margin: 0 auto;
+    padding: 18px 22px; display: none; gap: 16px; align-items: flex-start;
+    cursor: pointer; transition: opacity 0.6s ease, border-color 0.2s;
+}
+#vn-dialog-box.idle { opacity: 0; pointer-events: none; }
+#vn-dialog-box.interrupt { border-color: rgba(255, 128, 128, 0.65); }
+#vn-dialog-avatar { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; background: rgba(0, 0, 0, 0.3); flex: none; display: none; }
+#vn-dialog-content { flex: 1; min-width: 0; }
+#vn-dialog-name { font-size: 0.85rem; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 4px; }
+#vn-dialog-box.interrupt #vn-dialog-name { color: var(--danger); }
+#vn-dialog-text { font-size: 1.18rem; line-height: 1.65; min-height: 3.3em; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5); word-break: break-word; }
+.dice-num { font-size: 1.35em; font-weight: 700; color: var(--accent); }
+
+/* center cards (QTE / choices) */
+.center-card {
+    display: none; position: absolute; z-index: 20; top: 40%; left: calc(50% - (var(--right-inset) - var(--left-inset)) / 2);
+    transform: translate(-50%, -50%); width: min(400px, 90vw); padding: 28px; text-align: center;
+}
+#qte-overlay { border-color: rgba(255, 128, 128, 0.6); }
+#qte-title { font-size: 1.5rem; font-weight: 600; margin: 8px 0 16px; }
+.qte-bar { height: 4px; background: var(--fill); border-radius: 4px; overflow: hidden; margin-bottom: 18px; }
+.qte-bar i { display: block; height: 100%; width: 100%; background: var(--danger); }
+@keyframes qte-drain { from { width: 100%; } to { width: 0; } }
+#qte-btn { font-size: 1.15rem; padding: 14px 40px; animation: pulse 0.6s infinite; }
+#choices-container { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.choice-btn { padding: 13px 16px; font-size: 1rem; text-align: left; }
+@keyframes pulse { 50% { transform: scale(1.05); } }
+.shake { animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both; }
+@keyframes shake {
+    10%, 90% { transform: translate3d(-3px, 0, 0); } 20%, 80% { transform: translate3d(5px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-9px, 0, 0); } 40%, 60% { transform: translate3d(9px, 0, 0); }
+}
+
+/* ---------- floating panels ---------- */
+.panel { position: fixed; z-index: 30; display: flex; flex-direction: column; overflow: hidden; }
+.panel-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; cursor: pointer; user-select: none; flex: none;
+}
+.panel-head .chev { color: var(--muted); font-size: 1.1rem; line-height: 1; }
+.panel-body { padding: 4px 16px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.panel.collapsed .panel-body, .panel.collapsed .chat-input { display: none; }
+.panel.collapsed { height: auto !important; }
+.section-label { font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: -6px; }
+body.ui-hidden .panel { display: none; }
+
+#status-panel { top: 16px; left: 16px; width: 248px; max-height: calc(100vh - 220px); }
+.me-row { display: flex; align-items: center; gap: 10px; }
+.me-row img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: rgba(0, 0, 0, 0.3); }
+.me-row .who { flex: 1; min-width: 0; }
+.me-row .who div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#me-name { font-weight: 600; }
+#me-rank { font-size: 0.78rem; }
+.stat { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px; }
+.stat label { font-size: 0.72rem; letter-spacing: 0.1em; color: var(--muted); }
+.bar { height: 4px; background: var(--fill); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; transition: width 0.3s; }
+.bar.hp i { background: var(--hp); } .bar.sp i { background: var(--sp); }
+.stat-in { display: flex; align-items: baseline; gap: 4px; font-size: 0.8rem; color: var(--muted); }
+.stat-in input {
+    width: 48px; background: transparent; border: none; border-bottom: 1px solid var(--line);
+    color: var(--text); text-align: right; font-size: 0.95rem; padding: 1px 2px; -moz-appearance: textfield;
+}
+.stat-in input:focus { outline: none; border-color: var(--accent); }
+.stat-in input::-webkit-inner-spin-button { opacity: 0.4; }
+
+.party-row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: center; padding: 3px 0; }
+.party-row img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: rgba(0, 0, 0, 0.3); }
+.party-name { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.party-name .tag { font-size: 0.65rem; letter-spacing: 0.1em; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+.party-bars { grid-column: 2; display: flex; flex-direction: column; gap: 3px; }
+.party-bars .bar { height: 3px; }
+.vol-row { display: flex; align-items: center; gap: 8px; }
+.vol-row input[type=range] { flex: 1; accent-color: var(--accent); }
+
+#chat-panel { top: 16px; right: 16px; bottom: 16px; width: 344px; }
+#chat-history { flex: 1; overflow-y: auto; padding: 4px 16px 8px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.chat-msg { display: flex; gap: 10px; }
+.chat-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; background: rgba(0, 0, 0, 0.3); }
+.chat-content { flex: 1; min-width: 0; font-size: 0.92rem; line-height: 1.45; word-break: break-word; }
+.chat-name { font-size: 0.74rem; letter-spacing: 0.06em; color: var(--accent); margin-bottom: 1px; }
+.chat-msg.interrupt .chat-name, .chat-msg.interrupt .chat-text { color: var(--danger); }
+.chat-msg.system .chat-name { display: none; }
+.chat-msg.system .chat-text { color: var(--muted); font-size: 0.85rem; }
+.chat-input { padding: 12px 16px 16px; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 10px; flex: none; }
+.dice-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.dice-row .btn { flex: 1; padding: 5px 0; font-size: 0.76rem; min-width: 34px; }
+#chat-history::-webkit-scrollbar, .panel-body::-webkit-scrollbar { width: 6px; }
+#chat-history::-webkit-scrollbar-thumb, .panel-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+
+/* DM panel */
+#dm-panel { display: none; top: 16px; left: calc(100vw - 344px - 16px - 316px - 12px); width: 316px; max-height: calc(100vh - 32px); border-color: rgba(233, 216, 166, 0.35); }
+#dm-panel .panel-head { cursor: move; }
+#dm-panel .panel-body { gap: 4px; padding-top: 0; }
+#dm-panel details { border-top: 1px solid var(--line-soft); padding: 8px 0; }
+#dm-panel summary { cursor: pointer; font-size: 0.82rem; color: var(--accent); list-style: none; display: flex; justify-content: space-between; padding: 2px 0; }
+#dm-panel summary::-webkit-details-marker { display: none; }
+#dm-panel summary::after { content: "+"; color: var(--muted); }
+#dm-panel details[open] summary::after { content: "–"; }
+#dm-panel details > .stack { margin-top: 8px; }
+.mini-label { font-size: 0.72rem; color: var(--muted); }
+
+/* ui toggle */
+#ui-toggle { position: fixed; z-index: 40; left: 16px; bottom: 16px; width: 36px; height: 36px; padding: 0; border-radius: 50%; }
+#toast {
+    position: fixed; z-index: 3000; top: 20px; left: 50%; transform: translateX(-50%);
+    padding: 9px 18px; border-radius: 99px; font-size: 0.88rem; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+#toast.show { opacity: 1; }
+
+/* ---------- overlays ---------- */
+.overlay {
+    position: fixed; inset: 0; z-index: 2000; display: flex; justify-content: center; align-items: center;
+    background: rgba(5, 6, 10, 0.55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.modal-box { width: min(380px, 92vw); padding: 32px; background: var(--glass-solid); }
+.modal-box h2 { font-size: 1.15rem; font-weight: 600; text-align: center; margin: 6px 0 20px; }
+.modal-box .btn { margin-top: 6px; }
+.auth-msg { min-height: 1.2em; font-size: 0.85rem; text-align: center; color: var(--danger); margin-top: 10px; }
+.auth-msg.ok { color: #9fe0b0; }
+.toggle-text { text-align: center; font-size: 0.85rem; color: var(--muted); cursor: pointer; margin-top: 14px; }
+.toggle-text:hover { color: var(--text); }
+#acc-avatar { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; margin: 4px auto 14px; display: block; background: rgba(0, 0, 0, 0.3); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 860px) {
+    :root, body.status-collapsed, body.chat-collapsed { --left-inset: 16px; --right-inset: 16px; }
+    #status-panel, #chat-panel { width: calc(100vw - 32px); }
+    #status-panel { max-height: 60vh; }
+    #chat-panel { top: auto; height: 55vh; }
+    #vn-dialog-box { bottom: 70px; }
+    .sprite-slot { height: 50vh; bottom: 230px; }
+    #dm-panel { left: 16px; width: calc(100vw - 32px); }
+}
+</style>
+</head>
+<body>
+
+<div id="vn-screen">
+    <div id="slot-left" class="sprite-slot left"><img id="img-left" alt=""><span class="sprite-name" id="name-left"></span></div>
+    <div id="slot-right" class="sprite-slot right"><img id="img-right" alt=""><span class="sprite-name" id="name-right"></span></div>
+
+    <div id="qte-overlay" class="glass center-card">
+        <div class="eyebrow" style="color: var(--danger)">Quick Time Event</div>
+        <h2 id="qte-title">QTE</h2>
+        <div class="qte-bar"><i id="qte-fill"></i></div>
+        <button id="qte-btn" class="btn btn-danger">กดเลย!</button>
+    </div>
+
+    <div id="choices-overlay" class="glass center-card">
+        <div class="eyebrow">คุณจะทำอย่างไร</div>
+        <div id="choices-container"></div>
+    </div>
+
+    <div id="vn-dialog-box" class="glass" title="คลิกเพื่อข้ามการพิมพ์">
+        <img id="vn-dialog-avatar" src="" alt="">
+        <div id="vn-dialog-content">
+            <div id="vn-dialog-name"></div>
+            <div id="vn-dialog-text"></div>
+        </div>
+    </div>
+</div>
+
+<!-- LEFT: status -->
+<aside id="status-panel" class="panel glass">
+    <div class="panel-head" data-collapse="status"><span class="eyebrow">Status</span><span class="chev">–</span></div>
+    <div class="panel-body">
+        <div class="me-row">
+            <img id="me-avatar" src="" alt="">
+            <div class="who"><div id="me-name">-</div><div id="me-rank" class="muted">-</div></div>
+            <button class="btn btn-sm" id="acc-btn">บัญชี</button>
+        </div>
+        <div class="stack">
+            <div class="stat"><label>HP</label><div class="bar hp"><i id="hp-bar"></i></div>
+                <div class="stat-in"><input type="number" id="hp-val" min="0" value="100"><span>/ <span id="hp-max">100</span></span></div></div>
+            <div class="stat"><label>SP</label><div class="bar sp"><i id="sp-bar"></i></div>
+                <div class="stat-in"><input type="number" id="sp-val" min="0" value="100"><span>/ <span id="sp-max">100</span></span></div></div>
+        </div>
+
+        <div class="section-label">ในห้อง</div>
+        <div id="party"></div>
+
+        <div class="section-label">ฉาก</div>
+        <div class="row">
+            <button class="btn btn-sm" id="enter-left">ซ้าย</button>
+            <button class="btn btn-sm" id="enter-right">ขวา</button>
+            <button class="btn btn-sm btn-danger" id="leave-scene">ออก</button>
+        </div>
+
+        <div class="section-label">เสียง</div>
+        <div class="vol-row">
+            <button class="btn btn-sm" id="mute-btn" style="flex:none">เปิด</button>
+            <input type="range" id="vol" min="0" max="100" value="50" aria-label="ระดับเสียง">
+        </div>
+    </div>
+</aside>
+
+<!-- RIGHT: chat -->
+<aside id="chat-panel" class="panel glass">
+    <div class="panel-head" data-collapse="chat"><span class="eyebrow">Chat</span><span class="chev">–</span></div>
+    <div id="chat-history"></div>
+    <div class="chat-input">
+        <div class="dice-row" id="dice-row">
+            <button class="btn" data-dice="4">D4</button><button class="btn" data-dice="6">D6</button>
+            <button class="btn" data-dice="8">D8</button><button class="btn" data-dice="10">D10</button>
+            <button class="btn" data-dice="12">D12</button><button class="btn" data-dice="20">D20</button>
+            <button class="btn" data-dice="100">D100</button>
+        </div>
+        <div class="row">
+            <input type="text" id="player-msg" class="field" placeholder="พิมพ์ข้อความ แล้วกด Enter" maxlength="500" autocomplete="off">
+            <button id="send-btn" class="btn btn-primary" style="flex:none">ส่ง</button>
+        </div>
+    </div>
+</aside>
+
+<!-- DM -->
+<aside id="dm-panel" class="panel glass">
+    <div class="panel-head" id="dm-head"><span class="eyebrow" style="color: var(--accent)">DM Controls</span><span class="chev">⠿</span></div>
+    <div class="panel-body">
+        <details open>
+            <summary>บทพูด / NPC</summary>
+            <div class="stack">
+                <input type="text" id="dm-rp-name" class="field" placeholder="ชื่อ NPC (ว่าง = ใช้ชื่อ DM)">
+                <input type="text" id="dm-rp-avatar" class="field" placeholder="URL ภาพ NPC (ถ้ามี)">
+                <input type="text" id="dm-sys-msg" class="field" placeholder="ข้อความ...">
+                <div class="row">
+                    <button class="btn" id="dm-narrate">พูด</button>
+                    <button class="btn btn-danger" id="dm-interrupt">แทรกคิว!</button>
+                </div>
+            </div>
+        </details>
+        <details>
+            <summary>ฉากหลัง / เพลง</summary>
+            <div class="stack">
+                <input type="text" id="dm-bg" class="field" placeholder="URL รูปฉากหลัง">
+                <button class="btn" id="dm-bg-btn">เปลี่ยนฉาก</button>
+                <input type="text" id="dm-yt" class="field" placeholder="ลิงก์ YouTube / ID">
+                <div class="row">
+                    <button class="btn" id="dm-bgm-play">เล่นเพลง</button>
+                    <button class="btn" id="dm-bgm-stop">หยุดเพลง</button>
+                </div>
+            </div>
+        </details>
+        <details>
+            <summary>ตัวเลือก / QTE</summary>
+            <div class="stack">
+                <input type="text" id="dm-choice-1" class="field" placeholder="ตัวเลือก 1">
+                <input type="text" id="dm-choice-2" class="field" placeholder="ตัวเลือก 2">
+                <input type="text" id="dm-choice-3" class="field" placeholder="ตัวเลือก 3 (ไม่บังคับ)">
+                <input type="text" id="dm-choice-4" class="field" placeholder="ตัวเลือก 4 (ไม่บังคับ)">
+                <div class="row">
+                    <button class="btn" id="dm-choices-send">ส่งตัวเลือก</button>
+                    <button class="btn" id="dm-choices-clear">ปิด</button>
+                </div>
+                <div class="mini-label">QTE</div>
+                <input type="text" id="dm-qte-name" class="field" value="หลบการโจมตี!">
+                <div class="row">
+                    <input type="number" id="dm-qte-time" class="field" value="3" min="1" max="30" aria-label="วินาที">
+                    <button class="btn btn-danger" id="dm-qte-send" style="flex:2">ส่ง QTE</button>
+                </div>
+            </div>
+        </details>
+        <details>
+            <summary>ผู้เล่น / ลูกเต๋า / เอฟเฟกต์</summary>
+            <div class="stack">
+                <select id="dm-target" class="field"></select>
+                <div class="row"><input type="number" id="dm-hp" class="field" placeholder="HP"><input type="number" id="dm-maxhp" class="field" placeholder="Max HP"></div>
+                <div class="row"><input type="number" id="dm-sp" class="field" placeholder="SP"><input type="number" id="dm-maxsp" class="field" placeholder="Max SP"></div>
+                <button class="btn" id="dm-status-apply">ปรับสถานะ</button>
+                <div class="mini-label">เอฟเฟกต์</div>
+                <div class="row">
+                    <button class="btn" id="dm-shake">หน้าจอสั่น</button>
+                    <button class="btn btn-danger" id="dm-clear-scene">ล้างฉาก</button>
+                </div>
+                <div class="mini-label">DM ทอยเต๋า</div>
+                <div class="row">
+                    <select id="dm-dice" class="field"><option>4</option><option>6</option><option>8</option><option>10</option><option>12</option><option selected>20</option><option>100</option></select>
+                    <button class="btn" id="dm-roll">ทอย</button>
+                </div>
+            </div>
+        </details>
+    </div>
+</aside>
+
+<button id="ui-toggle" class="btn glass" title="ซ่อน/แสดงแผงทั้งหมด (กด H)" aria-label="ซ่อนแผง">◐</button>
+<div id="toast" class="glass"></div>
+
+<!-- account modal -->
+<div id="account-modal" class="overlay" style="display: none;">
+    <div class="modal-box glass" style="text-align: center;">
+        <img id="acc-avatar" src="" alt="">
+        <h2 id="acc-name" style="margin: 0 0 4px;">-</h2>
+        <div id="acc-rank" class="muted" style="margin-bottom: 22px;">-</div>
+        <button class="btn btn-block" id="acc-close">ปิด</button>
+        <button class="btn btn-block btn-danger" id="logout-btn">ออกจากระบบ</button>
+    </div>
+</div>
+
+<!-- auth -->
+<div id="auth-screen" class="overlay">
+    <div class="modal-box glass" id="login-box">
+        <div class="eyebrow" style="text-align:center">VN TRPG</div>
+        <h2>เข้าสู่ระบบ</h2>
+        <div class="stack">
+            <input type="text" id="login-user" class="field" placeholder="ชื่อบัญชี" autocomplete="username">
+            <input type="password" id="login-pass" class="field" placeholder="รหัสผ่าน" autocomplete="current-password">
+            <button class="btn btn-primary btn-block" id="login-btn">เข้าเล่นเกม</button>
+        </div>
+        <div class="toggle-text" id="to-register">ยังไม่มีบัญชี? สมัครใหม่</div>
+    </div>
+    <div class="modal-box glass" id="register-box" style="display: none;">
+        <div class="eyebrow" style="text-align:center">VN TRPG</div>
+        <h2>สร้างตัวละครใหม่</h2>
+        <div class="stack">
+            <input type="text" id="reg-user" class="field" placeholder="ชื่อบัญชี (2-24 ตัว)" autocomplete="username">
+            <input type="password" id="reg-pass" class="field" placeholder="รหัสผ่าน (อย่างน้อย 4 ตัว)" autocomplete="new-password">
+            <input type="text" id="reg-avatar" class="field" placeholder="URL ภาพโปรไฟล์ (ไม่บังคับ)">
+            <button class="btn btn-primary btn-block" id="register-btn">สมัครสมาชิก</button>
+        </div>
+        <div class="toggle-text" id="to-login">มีบัญชีแล้ว? กลับไปเข้าสู่ระบบ</div>
+    </div>
+    <div id="auth-msg" class="auth-msg" style="position:absolute; bottom: 12vh;"></div>
+</div>
+
+<div style="position: fixed; left: -400px; top: 0; width: 200px; height: 200px; opacity: 0.01; pointer-events: none;"><div id="yt-player"></div></div>
+
+<script src="/static/app.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>

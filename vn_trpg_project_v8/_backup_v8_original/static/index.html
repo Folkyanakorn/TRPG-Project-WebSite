@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VN TRPG - V8</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #000; color: white; overflow: hidden; display: flex; height: 100vh; flex-direction: row; }
+        
+        /* Auth & Modals */
+        .overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+        .modal-box { background: #1a1a2e; padding: 40px; border-radius: 10px; border: 2px solid #3498db; width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .modal-box h2 { text-align: center; color: #3498db; margin-bottom: 20px; }
+        .input-field { width: 100%; padding: 12px; margin-bottom: 15px; background: #0f0f1a; border: 1px solid #34495e; color: white; border-radius: 5px; font-size: 1rem; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-bottom: 10px; transition: 0.2s; color: white; }
+        .btn-green { background: #2ecc71; } .btn-green:hover { background: #27ae60; }
+        .btn-red { background: #e74c3c; } .btn-red:hover { background: #c0392b; }
+        .btn-blue { background: #3498db; } .btn-blue:hover { background: #2980b9; }
+        .toggle-text { text-align: center; font-size: 0.9rem; color: #bdc3c7; cursor: pointer; text-decoration: underline; }
+
+        /* 1. LEFT: Status Panel */
+        #status-panel { width: 280px; background: #1a1a2e; border-right: 3px solid #34495e; padding: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 10; overflow-y: auto; }
+        .acc-btn { background: transparent; border: 1px solid #f1c40f; color: #f1c40f; padding: 8px; border-radius: 5px; cursor: pointer; text-align: center; }
+        .status-box { background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 1px solid #2c3e50; }
+        .status-input { background: transparent; border: none; color: white; font-size: 1.2rem; font-weight: bold; width: 60px; border-bottom: 1px solid #fff; text-align: center; }
+        .scene-btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: auto; }
+
+        /* 2. CENTER: VN Screen */
+        #vn-screen { flex: 1; position: relative; background: url('https://images.unsplash.com/photo-1519074069444-1ba4fff66d16?q=80&w=1920') center/cover; transition: background-image 0.5s ease-in-out; overflow: hidden; }
+        
+        .sprite-slot { position: absolute; bottom: 200px; height: 70vh; z-index: 5; transition: all 0.5s ease-in-out; opacity: 0; }
+        .sprite-left { left: -100%; } /* starts off screen */
+        .sprite-right { right: -100%; }
+        .sprite-slot img { height: 100%; object-fit: contain; filter: drop-shadow(0 0 10px rgba(0,0,0,0.8)); }
+        
+        .show-left { left: 10%; opacity: 1; }
+        .show-right { right: 10%; opacity: 1; }
+
+        #vn-dialog-box { position: absolute; bottom: 30px; left: 5%; width: 90%; background: rgba(0, 0, 0, 0.85); border: 2px solid #ecf0f1; border-radius: 10px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.5); display: none; z-index: 10; flex-direction: row; gap: 15px; align-items: flex-start; }
+        #vn-dialog-avatar { width: 80px; height: 80px; border-radius: 10px; object-fit: cover; border: 2px solid #f1c40f; display: none; }
+        #vn-dialog-content { flex: 1; }
+        #vn-dialog-name { font-size: 1.4rem; font-weight: bold; color: #f1c40f; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px; }
+        #vn-dialog-text { font-size: 1.3rem; line-height: 1.6; color: white; }
+
+        #qte-overlay, #choices-overlay { display: none; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: rgba(0,0,0,0.8); padding: 40px; border-radius: 15px; border: 2px solid #3498db; box-shadow: 0 0 30px #3498db; z-index: 20; width: 400px; }
+        #qte-overlay { border-color: red; box-shadow: 0 0 30px red; }
+        #qte-btn { font-size: 2.5rem; padding: 20px 50px; background: #ff3333; color: white; border: 4px solid white; cursor: pointer; border-radius: 10px; animation: pulse 0.5s infinite; }
+        .choice-btn { width: 100%; padding: 15px; margin: 10px 0; font-size: 1.2rem; background: #2c3e50; border: 2px solid #3498db; color: white; border-radius: 8px; cursor: pointer; }
+        .choice-btn:hover { background: #3498db; }
+
+        /* 3. RIGHT: Chat Panel */
+        #chat-panel { width: 350px; background: #1a1a2e; border-left: 3px solid #34495e; display: flex; flex-direction: column; z-index: 10; }
+        #chat-history { flex: 1; overflow-y: auto; padding: 15px; font-size: 1rem; }
+        .chat-msg { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
+        .chat-avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #3498db; background: #000; }
+        .chat-content { flex: 1; line-height: 1.4; }
+        .chat-name { font-weight: bold; color: #f1c40f; margin-bottom: 3px; }
+        .input-group { display: flex; flex-direction: column; gap: 10px; padding: 15px; background: #0f0f1a; border-top: 1px solid #34495e; }
+        #player-msg { padding: 12px; background: rgba(255,255,255,0.9); border: none; border-radius: 6px; font-size: 1rem; color: #000; }
+
+        /* DM PANEL OVERLAY (Draggable/Floating) */
+        #dm-panel { display: none; position: absolute; top: 20px; right: 380px; width: 320px; background: rgba(20, 20, 40, 0.95); border: 2px solid #f1c40f; border-radius: 10px; padding: 15px; z-index: 100; box-shadow: 0 0 20px rgba(241,196,15,0.3); overflow-y: auto; max-height: 90vh; }
+        #dm-panel h3 { color: #f1c40f; text-align: center; border-bottom: 1px solid #555; padding-bottom: 10px; margin-bottom: 10px; cursor: move; }
+        .dm-group { margin-bottom: 15px; background: #000; padding: 10px; border-radius: 5px; }
+        .dm-input { width: 100%; padding: 5px; margin-bottom: 5px; background: #222; color: #0f0; border: 1px solid #0f0; }
+        .dm-btn { width: 100%; padding: 8px; background: #003300; color: #0f0; border: 1px solid #0f0; cursor: pointer; margin-bottom: 5px; }
+        .dm-btn:hover { background: #0f0; color: #000; }
+
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.1);} 100% {transform: scale(1);} }
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% {transform: translate3d(-5px, 0, 0);} 20%, 80% {transform: translate3d(5px, 0, 0);} 30%, 50%, 70% {transform: translate3d(-10px, 0, 0);} 40%, 60% {transform: translate3d(10px, 0, 0);} }
+    </style>
+</head>
+<body>
+    
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="overlay">
+        <div class="modal-box" id="login-box">
+            <h2>🔑 เข้าสู่ระบบ</h2>
+            <input type="text" id="login-user" class="input-field" placeholder="ชื่อบัญชี">
+            <input type="password" id="login-pass" class="input-field" placeholder="รหัสผ่าน">
+            <button class="btn btn-green" onclick="login()">เข้าเล่นเกม</button>
+            <p class="toggle-text" onclick="toggleAuth()">ยังไม่มีบัญชี? สมัครใหม่</p>
+        </div>
+        <div class="modal-box" id="register-box" style="display: none;">
+            <h2>📝 สร้างตัวละครใหม่</h2>
+            <input type="text" id="reg-user" class="input-field" placeholder="ชื่อบัญชี">
+            <input type="password" id="reg-pass" class="input-field" placeholder="รหัสผ่าน">
+            <input type="text" id="reg-avatar" class="input-field" placeholder="URL ภาพโปรไฟล์ (ลิงก์)">
+            <button class="btn btn-red" onclick="register()">สมัครสมาชิก</button>
+            <p class="toggle-text" onclick="toggleAuth()">มีบัญชีแล้ว? กลับไปหน้าเข้าสู่ระบบ</p>
+        </div>
+    </div>
+
+    <!-- Account Modal -->
+    <div id="account-modal" class="overlay" style="display: none;">
+        <div class="modal-box" style="text-align: center;">
+            <h2>👤 ข้อมูลตัวละคร</h2>
+            <img id="acc-avatar" src="" style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid #f1c40f; margin-bottom: 15px;">
+            <h3 id="acc-name" style="color: white; margin-bottom: 5px;">Name</h3>
+            <h4 id="acc-rank" style="color: #3498db; margin-bottom: 20px;">Rank</h4>
+            <button class="btn btn-blue" onclick="document.getElementById('account-modal').style.display='none'">ปิดหน้าต่าง</button>
+        </div>
+    </div>
+
+    <!-- 1. LEFT: Status Panel -->
+    <div id="status-panel">
+        <h2 style="text-align: center; color: #f1c40f;">📋 STATUS</h2>
+        <div class="acc-btn" onclick="showAccount()">ดูบัญชี / ยศ</div>
+        
+        <div class="status-box">
+            <h3 style="color:#e74c3c;">❤️ HP (พลังชีวิต)</h3>
+            <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-top: 10px;">
+                <input type="number" id="hp-val" class="status-input" value="100"> <span>/ 100</span>
+            </div>
+        </div>
+        <div class="status-box">
+            <h3 style="color:#3498db;">⚡ SP (พลังงาน)</h3>
+            <div style="display:flex; align-items:center; justify-content:center; gap: 10px; margin-top: 10px;">
+                <input type="number" id="sp-val" class="status-input" value="100"> <span>/ 100</span>
+            </div>
+        </div>
+        
+        <div class="scene-btn-group">
+            <p style="text-align:center; color:#bdc3c7; font-size: 0.9rem;">-- การเข้าฉาก (VN) --</p>
+            <button class="btn btn-blue" onclick="enterScene('left')">เดินเข้าฉาก (ซ้าย)</button>
+            <button class="btn btn-blue" onclick="enterScene('right')">เดินเข้าฉาก (ขวา)</button>
+            <button class="btn btn-red" onclick="leaveScene()">เดินออกจากฉาก</button>
+        </div>
+    </div>
+
+    <!-- 2. CENTER: VN Screen -->
+    <div id="vn-screen">
+        <div id="slot-left" class="sprite-slot sprite-left"><img src="" id="img-left"></div>
+        <div id="slot-right" class="sprite-slot sprite-right"><img src="" id="img-right"></div>
+        
+        <div id="qte-overlay">
+            <h2 id="qte-title" style="color: #ff4444; font-size: 2rem; margin-bottom: 20px;">⚠️ QUICK TIME EVENT ⚠️</h2>
+            <button id="qte-btn">Action!</button>
+        </div>
+
+        <div id="choices-overlay">
+            <h2 style="color: #3498db; margin-bottom: 20px;">❓ คุณจะทำอย่างไร?</h2>
+            <div id="choices-container"></div>
+        </div>
+        
+        <!-- กล่องข้อความสไตล์ VN -->
+        <div id="vn-dialog-box">
+            <img id="vn-dialog-avatar" src="">
+            <div id="vn-dialog-content">
+                <div id="vn-dialog-name">System</div>
+                <div id="vn-dialog-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. RIGHT: Chat Panel -->
+    <div id="chat-panel">
+        <h3 style="text-align: center; padding: 15px; border-bottom: 2px solid #34495e; color: #3498db;">💬 CHAT LOG</h3>
+        <div id="chat-history"></div>
+        <div class="input-group">
+            <input type="text" id="player-msg" placeholder="พิมพ์ข้อความ... (กด Enter)">
+            <button id="send-btn" class="btn btn-green">ส่งข้อความ</button>
+        </div>
+    </div>
+
+    <!-- DM FLOATING PANEL -->
+    <div id="dm-panel">
+        <h3>👑 DM CONTROLS</h3>
+        <div class="dm-group">
+            <label style="color:#0f0;">👤 สวมบทบาท (Roleplay Name):</label>
+            <input type="text" id="dm-rp-name" class="dm-input" placeholder="พิมพ์ชื่อ NPC...">
+        </div>
+        <div class="dm-group">
+            <label style="color:#0f0;">🎵 BGM (YouTube Link / ID):</label>
+            <input type="text" id="dm-yt" class="dm-input" placeholder="https://youtube.com/watch?v=...">
+            <button class="dm-btn" onclick="dmPlayBGM()">Play BGM</button>
+        </div>
+        <div class="dm-group">
+            <label style="color:#0f0;">🖼️ ฉากหลัง (Background Link):</label>
+            <input type="text" id="dm-bg" class="dm-input" placeholder="URL รูปภาพ">
+            <button class="dm-btn" onclick="dmChangeBG()">เปลี่ยนฉาก</button>
+        </div>
+        <div class="dm-group">
+            <label style="color:#0f0;">🎮 ระบบเกม (Mechanics):</label>
+            <button class="dm-btn" onclick="dmVFXShake()">💥 หน้าจอสั่น (Shake)</button>
+            <button class="dm-btn" style="border-color:red; color:red;" onclick="dmClearScene()">🧹 ล้างตัวละครออกจากฉาก</button>
+        </div>
+        <div class="dm-group">
+            <label style="color:#0f0;">❓ ระบบตัวเลือก (Choices):</label>
+            <input type="text" id="dm-choice-1" class="dm-input" placeholder="ตัวเลือก 1">
+            <input type="text" id="dm-choice-2" class="dm-input" placeholder="ตัวเลือก 2">
+            <button class="dm-btn" onclick="dmSendChoices()">ส่งตัวเลือกให้ผู้เล่น</button>
+        </div>
+        <div class="dm-group">
+            <label style="color:#0f0;">⚠️ ระบบ QTE (ตั้งชื่อเองได้):</label>
+            <input type="text" id="dm-qte-name" class="dm-input" value="หลบการโจมตี!">
+            <button class="dm-btn" style="background:#300; color:red;" onclick="dmSendQTE()">⚡ ส่ง QTE (3 วินาที)</button>
+        </div>
+        <div class="dm-group">
+            <label style="color:#0f0;">💬 แทรกพิมพ์ผลลัพธ์ DM:</label>
+            <input type="text" id="dm-sys-msg" class="dm-input" placeholder="พิมพ์ข้อความแทรก...">
+            <button class="dm-btn" style="background:#300; color:red;" onclick="dmInterrupt()">ตะโกน / แทรกคิว!</button>
+        </div>
+    </div>
+
+    <div style="position: absolute; top: -9999px;"><div id="yt-player"></div></div>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
